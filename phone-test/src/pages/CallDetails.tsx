@@ -1,18 +1,29 @@
-import { useQuery } from '@apollo/client';
+import { useMutation, useQuery } from '@apollo/client';
 import { useParams } from 'react-router-dom';
-import { GET_CALL_DETAILS } from '../gql/queries/getCallDetails';
-import { Box, Typography } from '@aircall/tractor';
+import { ARCHIVE_CALLS, GET_CALL_DETAILS } from '../gql/queries/getCallDetails';
+import { Box, Button, Typography } from '@aircall/tractor';
 import { useNavigate } from 'react-router-dom';
 import { formatDate, formatDuration } from '../helpers/dates';
+import { useEffect } from 'react';
 
 export const CallDetailsPage = () => {
   const { callId } = useParams();
   const navigate = useNavigate();
-  const { loading, error, data } = useQuery(GET_CALL_DETAILS, {
+  const { loading, error, data, startPolling, stopPolling } = useQuery(GET_CALL_DETAILS, {
     variables: {
       id: callId
-    }
+    },
+    pollInterval: 1000
   });
+  
+  const [archiveCalls] = useMutation(ARCHIVE_CALLS);
+
+  useEffect(() => {
+    startPolling(5000);
+    return () => {
+      stopPolling();
+    };
+  }, [startPolling, stopPolling]);
 
   if (error?.message === 'Unauthorized') {
     navigate('/login');
@@ -21,7 +32,13 @@ export const CallDetailsPage = () => {
   if (loading) return <p>Loading call details...</p>;
   if (error) return <p>ERROR</p>;
 
+  
   const { call } = data;
+  const handleArchive = () => {
+    return archiveCalls({
+      variables: { id: callId }
+    });
+  };
 
   return (
     <>
@@ -41,6 +58,9 @@ export const CallDetailsPage = () => {
         {call.notes?.map((note: Note, index: number) => {
           return <div>{`Note ${index + 1}: ${note.content}`}</div>;
         })}
+        <Button style={{ marginTop: 8 }} onClick={handleArchive}>
+          {call.is_archived ? 'Un Archive' : 'Archive'}
+        </Button>
       </Box>
     </>
   );
